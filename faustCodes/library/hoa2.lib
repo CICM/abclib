@@ -134,7 +134,7 @@ encoder(N, x, a) = encoder(N-1, x, a), x*sin(N*a), x*cos(N*a);
 //-----------------------------
 rEncoder(N, sp, a, it) = thisEncoder
 with {
-    basicEncoder(sig, angle) = encoder(N, sig, angle);
+    basicEncoder(sig, angle) = ho.encoder(N, sig, angle);
     thisEncoder = (_, rotationOrStaticAngle) : basicEncoder
     with {
         //converting the static angle from radians to [0; 1]
@@ -205,7 +205,7 @@ aleaEncoder(N, freq, angle, deltaAngle, index) = thisAleaEncoder
 //-----------------------------
 stereoEncoder(N, a) = (leftEncoder, rightEncoder) :> si.bus(2*N+1)
 with {
-    basicEncoder(sig, angle) = encoder(N, sig, angle);
+    basicEncoder(sig, angle) = ho.encoder(N, sig, angle);
     leftEncoder = (_, a / 2) : basicEncoder;
     rightEncoder = (_, -a /2) : basicEncoder;
 };
@@ -374,7 +374,7 @@ iBasicDecoder(N, la, direct, shift) = (par(i, 2*N+1, _) <: par(i, P, speaker(N, 
 with {
     P = outputs(la);
     ang(i) = (ba.take(i+1, la)  - direct * shift) * direct * ma.PI / 180.;
-    speaker(N,alpha) = /(2), par(i, 2*N, _), encoder(N,2/P,alpha) : si.dot(2*N+1);
+    speaker(N,alpha) = /(2), par(i, 2*N, _), ho.encoder(N,2/P,alpha) : si.dot(2*N+1);
 };
 
 
@@ -482,7 +482,7 @@ with {
     P = outputs(la);
     //The VBAP decoder uses VBAP compensation: it balances the regular decoder output enabling to use irregular angular setup.
     Q = max(2*N+2, P);
-    iVBAPDecoder = decoder(N, Q) : par(i, Q, circularScaledVBAP(la, (i * 360 / Q - direct * shift) * direct)) :> si.bus(P);
+    iVBAPDecoder = ho.decoder(N, Q) : par(i, Q, circularScaledVBAP(la, (i * 360 / Q - direct * shift) * direct)) :> si.bus(P);
 };
 
 
@@ -525,7 +525,7 @@ with {
     with {
         leftDispatcher = _<:(*(1-direct), *(direct));
         rightDispatcher = _<:(*(direct), *(1-direct));
-        gDecoderStereo = decoderStereo(N) : (*(g), *(g)) : (leftDispatcher, rightDispatcher) :> (_,_);
+        gDecoderStereo = ho.decoderStereo(N) : (*(g), *(g)) : (leftDispatcher, rightDispatcher) :> (_,_);
     };
     //
     thisDecoder = si.bus(2*N+1) <: (si.bus(2*N+1), si.bus(2*N+1)) : (imlsDecoder(N, la, direct, shift), paddedStereoDecoder(N, P)) : (par(i, P, *(ambi)), *(st), *(st), si.bus(P-2))  :> si.bus(P) : par(i, P, *(g));
@@ -708,7 +708,7 @@ with {
     optb = (ot == 0) : si.smoo;
     optm = (ot == 1) : si.smoo;
     opti = (ot == 2) : si.smoo;
-    thisOptimizer = ((si.bus(2*N+1) <: ((si.bus(2*N+1):optimBasic(N)), (si.bus(2*N+1):optimMaxRe(N)), (si.bus(2*N+1):optimInPhase(N)))), ((optb <: si.bus(2*N+1)), (optm <: si.bus(2*N+1)), (opti <: si.bus(2*N+1)))) : ro.interleave(6*N+3, 2) : par(i, 6*N+3, *) :> si.bus(2*N+1);
+    thisOptimizer = ((si.bus(2*N+1) <: ((si.bus(2*N+1):ho.optimBasic(N)), (si.bus(2*N+1):ho.optimMaxRe(N)), (si.bus(2*N+1):ho.optimInPhase(N)))), ((optb <: si.bus(2*N+1)), (optm <: si.bus(2*N+1)), (opti <: si.bus(2*N+1)))) : ro.interleave(6*N+3, 2) : par(i, 6*N+3, *) :> si.bus(2*N+1);
 };
 
 
@@ -1005,7 +1005,7 @@ with {
     //computes the ith duration of the ith delay in samples with twenty two possibilities of distribution
     elemdur(d, i, p, fa, tf, ind) = (tf == ind) * (fa > (1 - x)) * d * x * fa
     with {
-        x = th(ind, i, p);
+        x = _th(ind, i, p);
     };
     //duration in samples computed as a sum of the 22 cases//
     dur(d, i, p, fa, tf) = sum(ind, 22, elemdur(d, i, p, fa, tf, ind)) : int;
@@ -1083,7 +1083,7 @@ with {
     //computes the ith duration of the ith delay in samples with twenty two possibilities of distribution
     elemdur(d, i, p, fa, tf, ind) = (tf == ind) * (fa > (1 - x)) * d * x * fa
     with {
-        x = th(ind, i, p);
+        x = _th(ind, i, p);
     };
     //duration in samples computed as a sum of the 22 cases//
     dur(d, i, p, fa, tf) = sum(ind, 22, elemdur(d, i, p, fa, tf, ind)) : int;
@@ -1149,7 +1149,7 @@ with {
     //
     ringmodfreq(f, i, N, tf, ind) = (tf == ind) * f * x * coef
     with {
-        x = th(ind, i, N);
+        x = _th(ind, i, N);
         coef = min(1, max(N * (fa - (N - i - 1) / N), 0));
     };
     //
@@ -1217,7 +1217,7 @@ with {
     //
     ringmodfreq(f, i, N, tf, ind) = (tf == ind) * f * x * coef
     with {
-        x = th(ind, i, N);
+        x = _th(ind, i, N);
         coef = min(1, max(N * (fa - (N - i - 1) / N), 0));
     };
     //
@@ -1317,28 +1317,28 @@ synGain(N, lg) = _ <: si.bus(2*N+1) : fxGain(N, lg);
 //TYPES OF DISTRIBUTIONS: 22 EASING FUNCTIONS FROM [0, 1] to [0,1]
 //(i+1)/p belongs to [0, 1] and its image by any function in the list also belongs to the interval
 
-th(0, i, p) = (i+1) / p;
-th(1, i, p) = ((i+1) / p)^2;
-th(2, i, p) = sin(ma.PI * 0.5 * (i+1) / p);
-th(3, i, p) = log10(1 + (i+1) / p) / log10(2);
-th(4, i, p) = sqrt((i+1) / p);
-th(5, i, p) = 1 - cos(ma.PI * 0.5 * (i+1) / p);
-th(6, i, p) = (1 - cos(ma.PI * (i+1) / p)) * 0.5;
-th(7, i, p) = 1 - (1 - (i+1) / p )^2;
-th(8, i, p) = ((i+1) / p < 0.5) * 2 * ((i+1) / p)^2 + ((i+1) / p >= 0.5) * (1 - (-2 * (i+1) / p + 2)^2 * 0.5);
-th(9, i, p) = ((i+1) / p)^3;
-th(10, i, p) = 1 - (1 - (i+1) / p)^3;
-th(11, i, p) = ((i+1) / p < 0.5) * 4 * ((i+1) / p)^3 + ((i+1) / p >= 0.5) * (1 - (-2 * (i+1) / p + 2)^3 * 0.5);
-th(12, i, p) = ((i+1) / p)^4;
-th(13, i, p) = 1 - (1 - (i+1) / p)^4;
-th(14, i, p) = ((i+1) / p < 0.5) * 8 * ((i+1) / p)^4 + ((i+1) / p >= 0.5) * (1 - (-2 * (i+1) / p + 2)^4 * 0.5);
-th(15, i, p) = ((i+1) / p)^5;
-th(16, i, p) = 1 - (1 - (i+1) / p)^5;
-th(17, i, p) = ((i+1) / p < 0.5) * 16 * ((i+1) / p)^5 + ((i+1) / p >= 0.5) * (1 - (-2 * (i+1) / p + 2)^5 * 0.5);
-th(18, i, p) = 2^(10 * (i+1) / p - 10);
-th(19, i, p) = ((i+1) / p < 1) * (1 - 2^(-10 * (i+1) / p)) + ((i+1) / p == 1);
-th(20, i, p) = 1 - sqrt(1 - ((i+1) / p)^2);
-th(21, i, p) = sqrt(1 - ((i+1) / p - 1)^2);
+_th(0, i, p) = (i+1) / p;
+_th(1, i, p) = ((i+1) / p)^2;
+_th(2, i, p) = sin(ma.PI * 0.5 * (i+1) / p);
+_th(3, i, p) = log10(1 + (i+1) / p) / log10(2);
+_th(4, i, p) = sqrt((i+1) / p);
+_th(5, i, p) = 1 - cos(ma.PI * 0.5 * (i+1) / p);
+_th(6, i, p) = (1 - cos(ma.PI * (i+1) / p)) * 0.5;
+_th(7, i, p) = 1 - (1 - (i+1) / p )^2;
+_th(8, i, p) = ((i+1) / p < 0.5) * 2 * ((i+1) / p)^2 + ((i+1) / p >= 0.5) * (1 - (-2 * (i+1) / p + 2)^2 * 0.5);
+_th(9, i, p) = ((i+1) / p)^3;
+_th(10, i, p) = 1 - (1 - (i+1) / p)^3;
+_th(11, i, p) = ((i+1) / p < 0.5) * 4 * ((i+1) / p)^3 + ((i+1) / p >= 0.5) * (1 - (-2 * (i+1) / p + 2)^3 * 0.5);
+_th(12, i, p) = ((i+1) / p)^4;
+_th(13, i, p) = 1 - (1 - (i+1) / p)^4;
+_th(14, i, p) = ((i+1) / p < 0.5) * 8 * ((i+1) / p)^4 + ((i+1) / p >= 0.5) * (1 - (-2 * (i+1) / p + 2)^4 * 0.5);
+_th(15, i, p) = ((i+1) / p)^5;
+_th(16, i, p) = 1 - (1 - (i+1) / p)^5;
+_th(17, i, p) = ((i+1) / p < 0.5) * 16 * ((i+1) / p)^5 + ((i+1) / p >= 0.5) * (1 - (-2 * (i+1) / p + 2)^5 * 0.5);
+_th(18, i, p) = 2^(10 * (i+1) / p - 10);
+_th(19, i, p) = ((i+1) / p < 1) * (1 - 2^(-10 * (i+1) / p)) + ((i+1) / p == 1);
+_th(20, i, p) = 1 - sqrt(1 - ((i+1) / p)^2);
+_th(21, i, p) = sqrt(1 - ((i+1) / p - 1)^2);
 
 
 //========================================================================================
@@ -1855,7 +1855,7 @@ with {
     //computes the ith duration of the ith delay in samples with twenty two possibilities of distribution in three types of channel ordering
     elemdur(d, i, j, p, fa, tf, ind, ind2, mode) = (mode == ind2) * (tf == ind) * (fa > (1 - x)) * d * x * fa
     with {
-        x = th(ind, index(ind2, i, j), p);
+        x = _th(ind, index(ind2, i, j), p);
     };
     //duration in samples computed as a sum of the 66 cases, the twenty two possibilities of distribution and the three types of channel ordering//
     dur(d, i, j, p, fa, tf, mode) = sum(ind2, 3, sum(ind, 22, elemdur(d, i, j, p, fa, tf, ind, ind2, mode))) : int;
@@ -1960,7 +1960,7 @@ with {
     //
     ringmodfreq(f, mode, i, j, P, tf, ind, ind2) = (mode == ind2) * (tf == ind) * f * x * coef
     with {
-        x = th(ind, index(ind2, i, j), P);
+        x = _th(ind, index(ind2, i, j), P);
         coef = min(1, max(P * (fa - (P - index(ind2, i, j) - 1) / P), 0));
     };
     //
